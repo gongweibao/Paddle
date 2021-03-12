@@ -242,7 +242,7 @@ class Pod(object):
         return r
 
 
-def get_logger(log_level=20, name="root"):
+def get_logger(log_level=10, name="root"):
     logger = logging.getLogger(name)
     logger.setLevel(log_level)
 
@@ -299,6 +299,8 @@ def terminate_local_procs(procs):
             if p.log_fn:
                 p.log_fn.close()
             logger.debug("terminate process id:{}".format(p.proc.pid))
+    print("terminate_local_procs")
+    return
 
     # wait all process terminiated
     time.sleep(3)
@@ -949,6 +951,7 @@ class ParameterServerLauncher(object):
         self.start_pod_server(self.args, pod)
         self.start_pod_worker(self.args, pod)
         if self.distribute_mode == DistributeMode.PS_HETER:
+            logger.info("start_pod_heter_worker")
             self.start_pod_heter_worker(self.args, pod)
 
         logger.info(
@@ -966,12 +969,15 @@ class ParameterServerLauncher(object):
             logger.info(
                 "all workers exit, going to finish parameter server and heter_worker."
             )
+            logger.info("start_pod_heter_worker_2:{}".format(
+                len(self.procs["heter_worker"])))
             if len(self.procs["heter_worker"]) > 0:
                 for i, proc in enumerate(self.procs["heter_worker"]):
                     self.log_fns["heter_worker"][i].close()
                     self.procs["heter_worker"][i].proc.terminate()
-                logger.info("all heter_worker are killed")
-
+                logger.info("all heter_worker are killed sleep")
+            time.sleep(3)
+            return
             if len(self.procs["server"]) > 0:
                 for i, proc in enumerate(self.procs["server"]):
                     self.log_fns["server"][i].close()

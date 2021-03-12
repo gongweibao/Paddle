@@ -337,6 +337,7 @@ def launch():
     _print_arguments(args)
 
     distribute_mode = which_distributed_mode(args)
+    logger.info("distribute_mode:{}".format(distribute_mode))
     if distribute_mode == DistributeMode.COLLECTIVE:
         launch_collective(args)
     else:
