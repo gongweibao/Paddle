@@ -129,11 +129,11 @@ void Prepare(f::Scope* scope, const p::DeviceContext& ctx,
 }
 
 
-
+template <typename T>
 void touch_inf(f::Scope* scope, const p::DeviceContext& ctx){
-  std::vector<float16> init;
+  std::vector<T> init;
   for (int64_t i = 0; i < 1; ++i) {
-    init.push_back(static_cast<float16>(0.0));
+    init.push_back(static_cast<T>(0.0));
   }
 
   auto x = scope->Var("Ele_x");
@@ -160,7 +160,7 @@ template<typename T>
 void TestHCCLAllReduceOp(f::Scope* scope, const p::DeviceContext& ctx,
                          int iter, T val, T ret) {
   int rank_id = atoi(getenv("RANK_ID"));
-  int num1 = 3;
+  int num1 = 1;
   int num2 = 128;
   auto place = ctx.GetPlace();
 
@@ -185,6 +185,7 @@ void TestHCCLAllReduceOp(f::Scope* scope, const p::DeviceContext& ctx,
   auto tensor_out = out->GetMutable<f::LoDTensor>();
   tensor_out->Resize({num1, num2});
   tensor_out->mutable_data<T>(place);  // allocate
+  ctx.Wait();
 
   // run
   f::AttributeMap attrs;
@@ -238,15 +239,20 @@ TEST(c_allreduce_sum, NPU) {
   float_status->Resize({8});
   float_status->mutable_data<float>(ctx.GetPlace());
 
-  o::alloc_float_status(ctx, float_status);
   for (int i = 0; i < 1; i++) {
-    VLOG(2) << "iter num: " << i << " float";
+    VLOG(2) << "before touch inf:float";
+    o::clear_float_status(ctx, float_status, &tmp);
+    ctx.Wait();
+    o::alloc_float_status(ctx, float_status);
+    ctx.Wait();
     TestHCCLAllReduceOp<float>(&scope, ctx, i, 1.0, 3.0);
-    VLOG(2) << "iter num: " << i << " float16";
+    o::clear_float_status(ctx, float_status, &tmp);
+    ctx.Wait();
+    o::alloc_float_status(ctx, float_status);
+    ctx.Wait();
+    VLOG(2) << "before touch inf:float16";
     TestHCCLAllReduceOp<float16>(&scope, ctx, i, static_cast<float16>(1.0), static_cast<float16>(3.0));
   }
-
-  touch_inf(&scope, ctx);
 
   /*
   o::alloc_float_status(ctx, float_status);
@@ -266,14 +272,24 @@ TEST(c_allreduce_sum, NPU) {
   }
 
   */
-  o::clear_float_status(ctx, float_status, &tmp);
-  ctx.Wait();
+  VLOG(2) << "after touch inf";
 
-  o::alloc_float_status(ctx, float_status);
+
   for (int i = 0; i < 1; i++) {
-    VLOG(2) << "iter num 4: " << i << " float";
+    touch_inf<float>(&scope, ctx);
+    VLOG(2) << "after touch inf, float";
+    o::clear_float_status(ctx, float_status, &tmp);
+    ctx.Wait();
+    o::alloc_float_status(ctx, float_status);
+    ctx.Wait();
     TestHCCLAllReduceOp<float>(&scope, ctx, i, 1.0, 3.0);
-    VLOG(2) << "iter num 4: " << i << " float16";
+    ctx.Wait();
+    touch_inf<float16>(&scope, ctx);
+    o::clear_float_status(ctx, float_status, &tmp);
+    ctx.Wait();
+    o::alloc_float_status(ctx, float_status);
+    ctx.Wait();
+    VLOG(2) << "after touch inf, float16";
     TestHCCLAllReduceOp<float16>(&scope, ctx, i, static_cast<float16>(1.0), static_cast<float16>(3.0));
   }
   o::clear_float_status(ctx, float_status, &tmp);

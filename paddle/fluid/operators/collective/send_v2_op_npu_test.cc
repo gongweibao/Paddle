@@ -50,19 +50,19 @@ void PrepareUniqueId(f::Scope* scope, const p::DeviceContext& ctx,
                      HcclRootInfo* hccl_id) {
   int rank_id = atoi(getenv("RANK_ID"));
   int device_id = atoi(getenv("DEVICE_ID"));
+  int peer_id = atoi(getenv("PEER_ID"));
 
   VLOG(2) << "rank_id = " << rank_id << "; device_id = " << device_id
-          << "; rank_id = " << rank_id
-          << "; RANK_TABLE_FILE = " << atoi(getenv("DEVICE_ID"));
+          << "; peer_id = " << peer_id;
 
-  std::vector<int> rank_ids{0, 1};
+  std::vector<int> rank_ids{0,1};
   f::AttributeMap gen_hccl_id;
 
-  std::vector<std::string> endpointList = {"127.0.0.1:6175", "127.0.0.1:6177"};
+  std::vector<std::string> endpointList = {"127.0.0.1:6175", "127.0.0.1:6177","127.0.0.1:6179", "127.0.0.1:6181","127.0.0.1:6183", "127.0.0.1:6185","127.0.0.1:6187", "127.0.0.1:6189"};
   gen_hccl_id["rank"] = rank_id;
-  gen_hccl_id["endpoint"] = endpointList[rank_id];
+  gen_hccl_id["endpoint"] = endpointList[device_id];
   std::vector<std::string> other_endpoints = {
-      endpointList[rank_id == 0 ? 1 : 0]};
+      endpointList[peer_id]};
   gen_hccl_id["other_endpoints"] = other_endpoints;
 
   auto out = scope->Var("Out");
@@ -89,10 +89,10 @@ void Prepare(f::Scope* scope, const p::DeviceContext& ctx,
 
   int rank_id = atoi(getenv("RANK_ID"));
   int device_id = atoi(getenv("DEVICE_ID"));
+  int peer_id = atoi(getenv("PEER_ID"));
 
   VLOG(2) << "rank_id = " << rank_id << "; device_id = " << device_id
-          << "; rank_id = " << rank_id
-          << "; RANK_TABLE_FILE = " << atoi(getenv("DEVICE_ID"));
+          << "; peer_id = " << peer_id;
 
   // std::vector<int> rank_ids{0, 1};
   f::AttributeMap comm_init_attrs;
@@ -116,7 +116,7 @@ void TestHcomSendOp(f::Scope* scope, const p::DeviceContext& ctx) {
 
   EXPECT_GT(num, 0);
   EXPECT_LT(num, 1 << 15);
-  std::vector<float> init(num * num, 1.0 * atoi(getenv("DEST_RANK")));
+  std::vector<float> init(num * num, 1.0 * atoi(getenv("PEER_ID")));
   int rank_id = atoi(getenv("RANK_ID"));
   VLOG(3) << "rank id:" << rank_id;
   TensorFromVector(init, ctx, tensor_x);
@@ -127,7 +127,7 @@ void TestHcomSendOp(f::Scope* scope, const p::DeviceContext& ctx) {
 
   f::AttributeMap attrs;
   attrs["tag"] = std::string("srtest");
-  attrs["peer"] = atoi(getenv("DEST_RANK"));
+  attrs["peer"] = 0;
   attrs["ring_id"] = 0;
   attrs["srTag"] = 0;
 
