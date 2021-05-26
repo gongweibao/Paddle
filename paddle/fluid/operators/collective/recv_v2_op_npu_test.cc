@@ -51,19 +51,19 @@ void PrepareUniqueId(f::Scope* scope, const p::DeviceContext& ctx,
                      HcclRootInfo* hccl_id) {
   int rank_id = atoi(getenv("RANK_ID"));
   int device_id = atoi(getenv("DEVICE_ID"));
+  int peer_id = atoi(getenv("PEER_ID"));
 
   VLOG(2) << "rank_id = " << rank_id << "; device_id = " << device_id
-          << "; rank_id = " << rank_id
-          << "; RANK_TABLE_FILE = " << atoi(getenv("DEVICE_ID"));
+          << "; peer_id = " << peer_id;
 
   std::vector<int> rank_ids{0, 1};
   f::AttributeMap gen_hccl_id;
 
-  std::vector<std::string> endpointList = {"127.0.0.1:6175", "127.0.0.1:6177"};
+  std::vector<std::string> endpointList = {"127.0.0.1:6175", "127.0.0.1:6177","127.0.0.1:6179", "127.0.0.1:6181","127.0.0.1:6183", "127.0.0.1:6185","127.0.0.1:6187", "127.0.0.1:6189"};
   gen_hccl_id["rank"] = rank_id;
-  gen_hccl_id["endpoint"] = endpointList[rank_id];
+  gen_hccl_id["endpoint"] = endpointList[device_id];
   std::vector<std::string> other_endpoints = {
-      endpointList[rank_id == 0 ? 1 : 0]};
+      endpointList[peer_id]};
   gen_hccl_id["other_endpoints"] = other_endpoints;
 
   auto out = scope->Var("Out");
@@ -90,10 +90,10 @@ void Prepare(f::Scope* scope, const p::DeviceContext& ctx,
 
   int rank_id = atoi(getenv("RANK_ID"));
   int device_id = atoi(getenv("DEVICE_ID"));
+  int peer_id = atoi(getenv("PEER_ID"));
 
   VLOG(2) << "rank_id = " << rank_id << "; device_id = " << device_id
-          << "; rank_id = " << rank_id
-          << "; RANK_TABLE_FILE = " << atoi(getenv("DEVICE_ID"));
+          << "; peer_id = " << peer_id;
 
   // std::vector<int> rank_ids{0, 1};
   f::AttributeMap comm_init_attrs;
@@ -124,19 +124,20 @@ void TestHcomRecvOp(f::Scope* scope, const p::DeviceContext& ctx) {
   auto tensor_out = out->GetMutable<f::LoDTensor>();
   tensor_out->Resize({num, num});
   tensor_out->mutable_data<float>(place);  // allocate
-
+  VLOG(3) << "Output tensor applied";
   ctx.Wait();
 
   f::AttributeMap attrs;
   attrs["tag"] = std::string("srtest");
-  attrs["peer"] = atoi(getenv("SRC_RANK"));
+  attrs["peer"] = 0;
   attrs["ring_id"] = 0;
   attrs["srTag"] = 0;
   std::vector<int> out_shape;
   out_shape.push_back(num);
   out_shape.push_back(num);
+  VLOG(3) << "before Output shape ";
   attrs["out_shape"] = out_shape;
-
+  VLOG(3) << "after Output shape ";
   auto op = f::OpRegistry::CreateOp("recv_v2", {}, {{"Out", {"Data"}}}, attrs);
   VLOG(3) << "CreateOp recv_v2";
 
