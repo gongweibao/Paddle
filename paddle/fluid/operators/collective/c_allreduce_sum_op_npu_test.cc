@@ -32,14 +32,13 @@ limitations under the License. */
 #include "paddle/fluid/operators/math/math_function.h"
 #include "paddle/fluid/string/printf.h"
 
-#include "paddle/fluid/operators/collective/c_allreduce_op.h"
-#include "paddle/fluid/operators/collective/gen_hccl_id_op_helper.h"
+//#include "paddle/fluid/operators/collective/c_allreduce_op.h"
+//#include "paddle/fluid/operators/collective/gen_hccl_id_op_helper.h"
 
 #if defined(PADDLE_WITH_ASCEND_CL)
-#include "paddle/fluid/platform/collective_helper.h"
-#include "paddle/fluid/platform/hccl_helper.h"
+//#include "paddle/fluid/platform/collective_helper.h"
+//#include "paddle/fluid/platform/hccl_helper.h"
 #include "paddle/fluid/operators/npu_op_runner.h"
-#include "paddle/fluid/operators/npu_utils.h"
 #endif
 
 namespace f = paddle::framework;
@@ -48,12 +47,13 @@ namespace m = paddle::operators::math;
 namespace o = paddle::operators;
 using float16 = paddle::platform::float16;
 
-USE_OP(c_allreduce_sum);
+USE_OP(elementwise_add);
+//USE_OP(c_allreduce_sum);
 USE_OP(alloc_float_status);
 USE_OP(elementwise_div);
-USE_NO_KERNEL_OP(c_gen_hccl_id);
-USE_NO_KERNEL_OP(c_comm_init_hccl);
-USE_OP_DEVICE_KERNEL(c_allreduce_sum, NPU);
+//USE_NO_KERNEL_OP(c_gen_hccl_id);
+//USE_NO_KERNEL_OP(c_comm_init_hccl);
+USE_OP_DEVICE_KERNEL(elementwise_add, NPU);
 USE_OP_DEVICE_KERNEL(alloc_float_status, NPU);
 USE_OP_DEVICE_KERNEL(elementwise_div, NPU);
 
@@ -68,6 +68,7 @@ void PrintDebugInfo(const std::string preStr, const std::vector<T>& data) {
   std::cout << "\n";
 }
 
+/*
 void PrepareUniqueId(f::Scope* scope, const p::DeviceContext& ctx,
                      HcclRootInfo* hccl_id) {
   int rank_id = atoi(getenv("RANK_ID"));
@@ -101,18 +102,20 @@ void PrepareUniqueId(f::Scope* scope, const p::DeviceContext& ctx,
 
   memcpy(hccl_id, id, 1024);
 }
+*/
 
+/*
 void Prepare(f::Scope* scope, const p::DeviceContext& ctx,
              HcclRootInfo* hccl_id) {
   auto x = scope->Var("X");
-  auto id = x->GetMutable<HcclRootInfo>();
+  //auto id = x->GetMutable<HcclRootInfo>();
 
-  memcpy(id, hccl_id, 1024);
+  //memcpy(id, hccl_id, 1024);
 
-  int rank_id = atoi(getenv("RANK_ID"));
+ // int rank_id = atoi(getenv("RANK_ID"));
   int device_id = atoi(getenv("DEVICE_ID"));
 
-  VLOG(2) << "rank_id = " << rank_id << "; device_id = " << device_id
+  VLOG(2) << "  device_id = " << device_id
           << "; rank_id = " << rank_id
           << "; RANK_TABLE_FILE = " << atoi(getenv("DEVICE_ID"));
 
@@ -127,7 +130,7 @@ void Prepare(f::Scope* scope, const p::DeviceContext& ctx,
   comm_init_op->Run(*scope, place);
   ctx.Wait();
 }
-
+*/
 
 template <typename T>
 void touch_inf(f::Scope* scope, const p::DeviceContext& ctx){
@@ -154,10 +157,16 @@ void touch_inf(f::Scope* scope, const p::DeviceContext& ctx){
   auto op = f::OpRegistry::CreateOp("elementwise_div", {{"X", {"Ele_x"}}, {"Y", {"Ele_y"}}},
                                     {{"Out", {"Ele_out"}}}, {});
   op->Run(*scope, ctx.GetPlace());
+  ctx.Wait();
+  std::vector<T> out_vec;
+  TensorToVector(*tensor_out, ctx, &out_vec);
+  ctx.Wait();
+
+  PrintDebugInfo("touch inf output data: ", out_vec);
 }
 
 template<typename T>
-void TestHCCLAllReduceOp(f::Scope* scope, const p::DeviceContext& ctx,
+void TestElementwiseAddOp(f::Scope* scope, const p::DeviceContext& ctx,
                          int iter, T val, T ret) {
   int rank_id = atoi(getenv("RANK_ID"));
   int num1 = 1;
@@ -165,19 +174,33 @@ void TestHCCLAllReduceOp(f::Scope* scope, const p::DeviceContext& ctx,
   auto place = ctx.GetPlace();
 
   // init
-  auto x = scope->Var("Data");
+  auto x = scope->Var("Data1");
   auto tensor_x = x->GetMutable<f::LoDTensor>();
   tensor_x->Resize({num1, num2});
   tensor_x->mutable_data<T>(place);  // allocate
 
   // copy data
-  std::vector<T> init;
+  std::vector<T> init1;
   for (int64_t i = 0; i < num1 * num2; ++i) {
-    init.push_back(val + static_cast<T>(rank_id));
+    init1.push_back(val + static_cast<T>(rank_id+1.0));
   }
-  PrintDebugInfo("input data", init);
-  TensorFromVector(init, ctx, tensor_x);
+  PrintDebugInfo("input data1: ", init1);
+  TensorFromVector(init1, ctx, tensor_x);
   tensor_x->Resize({num1, num2});
+
+  auto y = scope->Var("Data2");
+  auto tensor_y = y->GetMutable<f::LoDTensor>();
+  tensor_y->Resize({num1, num2});
+  tensor_y->mutable_data<T>(place);  // allocate
+
+  // copy data
+  std::vector<T> init2;
+  for (int64_t i = 0; i < num1 * num2; ++i) {
+    init2.push_back(val + static_cast<T>(rank_id+2.0));
+  }
+  PrintDebugInfo("input data2: ", init2);
+  TensorFromVector(init2, ctx, tensor_y);
+  tensor_y->Resize({num1, num2});
   ctx.Wait();
 
   // out data
@@ -188,13 +211,13 @@ void TestHCCLAllReduceOp(f::Scope* scope, const p::DeviceContext& ctx,
   ctx.Wait();
 
   // run
-  f::AttributeMap attrs;
-  attrs["tag"] = std::string("tagx_" + std::to_string(iter));
-  attrs["ring_id"] = 0;
+ // f::AttributeMap attrs;
+//  attrs["tag"] = std::string("tagx_" + std::to_string(iter));
+ // attrs["ring_id"] = 0;
 
 
-  auto op = f::OpRegistry::CreateOp("c_allreduce_sum", {{"X", {"Data"}}, {"FloatStatus", {"FloatStatus"}}},
-                                    {{"Out", {"OutData"}}}, attrs);
+  auto op = f::OpRegistry::CreateOp("elementwise_add", {{"X", {"Data1"}}, {"Y", {"Data2"}}},
+                                    {{"Out", {"OutData"}}},{});
 
   for (int i = 0; i < 1; i++) {
     op->Run(*scope, place);
@@ -205,12 +228,12 @@ void TestHCCLAllReduceOp(f::Scope* scope, const p::DeviceContext& ctx,
   TensorToVector(*tensor_out, ctx, &out_vec);
   ctx.Wait();
 
-  PrintDebugInfo("output data", out_vec);
+  PrintDebugInfo("output data: ", out_vec);
 
-  EXPECT_EQ(out_vec.size(), init.size());
+  EXPECT_EQ(out_vec.size(), init1.size());
   if(!std::isinf(ret)){
       for (uint32_t i = 0; i < out_vec.size(); i++) {
-        auto ret = abs(static_cast<float>(out_vec[i]) - 3.0);
+        auto ret = abs(static_cast<float>(out_vec[i]) - 5.0);
         EXPECT_TRUE(ret < 0.1);
       }
   }else{
@@ -220,15 +243,15 @@ void TestHCCLAllReduceOp(f::Scope* scope, const p::DeviceContext& ctx,
   }
 }
 
-TEST(c_allreduce_sum, NPU) {
+TEST(elementwise_add, NPU) {
   f::Scope scope;
-  HcclRootInfo hccl_id;
+//  HcclRootInfo hccl_id;
 
   p::NPUDeviceContext ctx(p::NPUPlace(atoi(FLAGS_selected_npus.c_str())));
 
   // only support one device, if more than one device, use first default
-  PrepareUniqueId(&scope, ctx, &hccl_id);
-  Prepare(&scope, ctx, &hccl_id);
+ // PrepareUniqueId(&scope, ctx, &hccl_id);
+ // Prepare(&scope, ctx, &hccl_id);
   //auto inf_all = std::numeric_limits<float>::infinity();
 
   f::Tensor tmp;
@@ -245,13 +268,13 @@ TEST(c_allreduce_sum, NPU) {
     ctx.Wait();
     o::alloc_float_status(ctx, float_status);
     ctx.Wait();
-    TestHCCLAllReduceOp<float>(&scope, ctx, i, 1.0, 3.0);
+    TestElementwiseAddOp<float>(&scope, ctx, i, 1.0, 3.0);
     o::clear_float_status(ctx, float_status, &tmp);
     ctx.Wait();
     o::alloc_float_status(ctx, float_status);
     ctx.Wait();
     VLOG(2) << "before touch inf:float16";
-    TestHCCLAllReduceOp<float16>(&scope, ctx, i, static_cast<float16>(1.0), static_cast<float16>(3.0));
+    TestElementwiseAddOp<float16>(&scope, ctx, i, static_cast<float16>(1.0), static_cast<float16>(3.0));
   }
 
   /*
@@ -282,7 +305,7 @@ TEST(c_allreduce_sum, NPU) {
     ctx.Wait();
     o::alloc_float_status(ctx, float_status);
     ctx.Wait();
-    TestHCCLAllReduceOp<float>(&scope, ctx, i, 1.0, 3.0);
+    TestElementwiseAddOp<float>(&scope, ctx, i, 1.0, 3.0);
     ctx.Wait();
     touch_inf<float16>(&scope, ctx);
     o::clear_float_status(ctx, float_status, &tmp);
@@ -290,7 +313,7 @@ TEST(c_allreduce_sum, NPU) {
     o::alloc_float_status(ctx, float_status);
     ctx.Wait();
     VLOG(2) << "after touch inf, float16";
-    TestHCCLAllReduceOp<float16>(&scope, ctx, i, static_cast<float16>(1.0), static_cast<float16>(3.0));
+    TestElementwiseAddOp<float16>(&scope, ctx, i, static_cast<float16>(1.0), static_cast<float16>(3.0));
   }
   o::clear_float_status(ctx, float_status, &tmp);
   ctx.Wait();
