@@ -4662,6 +4662,7 @@ class PipelineOptimizer(object):
         pre_stage_id = None
         decrease_flag = False
         in_optimize = False
+        #print(block._to_readable_code(skip_op_callstack=False))
         for op in block.ops:
             if not op._has_kernel(op.type):
                 assert op.type == "conditional_block" and (

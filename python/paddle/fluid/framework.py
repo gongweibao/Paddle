@@ -2034,6 +2034,8 @@ class Operator(object):
             # when force_cpu and device_guard are used at the same time, a warning will be given.
             # TODO(zhangting2020): when force_cpu is removed, clear warning below.
             if _current_device is not None:
+                #if type == "fill_constant":
+                #    print("_current_device:", _current_device)
                 if self._has_kernel(type):
                     op_device = op_maker.kOpDeviceAttrName()
                     op_attrs[op_device] = _current_device
@@ -2098,6 +2100,8 @@ class Operator(object):
                     if out_proto.name not in outputs:
                         continue
                     out_args = outputs[out_proto.name]
+                    #if type=="fill_constant":
+                    #    print(out_args)
                     if not isinstance(out_args, list):
                         out_args = [out_args]
                     if not out_proto.duplicable and len(out_args) > 1:
