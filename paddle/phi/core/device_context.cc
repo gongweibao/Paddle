@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "glog/logging.h"
 #include "paddle/phi/core/device_context.h"
 
 #if defined(PADDLE_WITH_CUDA)
@@ -138,6 +139,8 @@ struct DeviceContext::Impl {
               size_t requested_size = 0,
               bool pinned = false,
               bool fake_alloc = false) const {
+    VLOG(6) << "gongwb Alloc tensor:" << requested_size << " dtype:" << dtype 
+        << " pinned:" << pinned;
     PADDLE_ENFORCE_NOT_NULL(
         tensor,
         phi::errors::InvalidArgument(
@@ -165,6 +168,9 @@ struct DeviceContext::Impl {
         (fake_alloc || tensor->numel() == 0) && requested_size == 0
             ? zero_allocator_
             : (pinned ? pinned_allocator_ : device_allocator_);
+    VLOG(6) << "gongwb allocator:" << allocator 
+            << ", zero_allocator:" << zero_allocator_ 
+            << "device_allocator" << device_allocator_; 
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
     bool must_cuda_graph_allocator =
         (!fake_alloc && tensor->numel() != 0) && !pinned;
@@ -178,10 +184,17 @@ struct DeviceContext::Impl {
       allocator = cuda_graph_allocator_;
     }
 #endif
-    return tensor->AllocateFrom(const_cast<Allocator*>(allocator),
+    std::cout << "gongwb before allocate";
+    static_cast<phi::DenseTensor*>(tensor)->debug_print_tmp();
+
+    auto *ret = tensor->AllocateFrom(const_cast<Allocator*>(allocator),
                                 dtype,
                                 requested_size,
                                 fake_alloc);  // NOLINT
+
+    std::cout << "gongwb after allocate";
+    static_cast<phi::DenseTensor*>(tensor)->debug_print_tmp();           
+    return ret;
   }
 
   template <typename T>
@@ -189,6 +202,7 @@ struct DeviceContext::Impl {
            const Place& place,
            size_t requested_size = 0,
            bool pinned = false) const {
+    VLOG(6) << "gongwb Alloc tensor:" << requested_size;
     DataType dtype = phi::CppTypeToDataType<T>::Type();
     return static_cast<T*>(Alloc(tensor, place, dtype, requested_size, pinned));
   }
@@ -384,6 +398,8 @@ void* DeviceContext::Alloc(TensorBase* tensor,
                            size_t requested_size,
                            bool pinned,
                            bool fake_alloc) const {
+   VLOG(6) << "gongwb Alloc tensor:" << requested_size << " dtype:" << dtype 
+        << " pinned:" << pinned;
   if (pinned) {
     return impl_->Alloc(tensor,
                         GetPinnedPlace(GetPlace()),

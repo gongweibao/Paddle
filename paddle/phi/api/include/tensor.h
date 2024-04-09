@@ -505,6 +505,8 @@ class PADDLE_API Tensor final {
    */
   bool initialized() const;
   bool has_allocation() const;
+
+  void debug_print() const;
   /**
    * @brief Determine whether Tensor is initialized.
    * This is a deprecated method and may be removed in the future!

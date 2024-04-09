@@ -154,6 +154,8 @@ class DenseTensor : public WrapperBase<PD_Tensor> {
   }
 
   void* Holder() const {
+    VLOG(6) << "gongwb Holder raw_data:" << raw_data() 
+            << ", status:" << status;
     C_Status status;
     auto holder = PD_TensorGetHolder(raw_data(), &status);
     PD_CHECK_STATUS(status);

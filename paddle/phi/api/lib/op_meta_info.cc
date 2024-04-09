@@ -59,9 +59,10 @@ std::vector<std::string> ParseAttrStr(const std::string& attr) {
 }
 
 PADDLE_API void AssignTensorImpl(const Tensor& src, Tensor* dst) {
-  if (!src.initialized() || !dst->defined()) {
+  if (!src.has_allocation() || !dst->defined()) {
     VLOG(3) << "Custom operator assigns non-initialized tensor, this only "
                "happens when handling inplace optional inputs & outputs.";
+    // PADDLE_THROW(phi::errors::Fatal("Custom operator assigns non-initialized tensor, this only"));
     return;
   }
   PADDLE_ENFORCE_EQ(
@@ -71,7 +72,7 @@ PADDLE_API void AssignTensorImpl(const Tensor& src, Tensor* dst) {
       phi::errors::Unavailable(
           "Now only supported DenseTensor and DistTensor in Custom Operator."));
   PADDLE_ENFORCE_EQ(
-      src.initialized(),
+      src.has_allocation(),
       true,
       phi::errors::Unavailable(
           "The Custom OpKernel calculate output is not initialized."));

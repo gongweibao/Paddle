@@ -47,6 +47,8 @@ using DefaultAllocator = experimental::DefaultAllocator;
 
 Tensor::Tensor(std::shared_ptr<phi::TensorBase> tensor_impl)
     : impl_(std::move(tensor_impl)) {
+  std::cout << "gongwb: a new tensor is created";
+  debug_print();
   PADDLE_ENFORCE_NOT_NULL(
       impl_,
       phi::errors::InvalidArgument("TensorImpl with nullptr is not supported"));
@@ -417,6 +419,11 @@ bool Tensor::has_allocation() const {
     PADDLE_THROW(phi::errors::Unimplemented(
         "Only support has_allocation operation on DenseTensor now."));
   }
+}
+
+void Tensor::debug_print() const{
+  auto tmp = static_cast<phi::DenseTensor *>(impl_.get());
+  tmp->debug_print_tmp(); 
 }
 
 void Tensor::reset() {

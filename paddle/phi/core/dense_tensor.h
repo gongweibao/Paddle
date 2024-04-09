@@ -130,6 +130,17 @@ class TEST_API DenseTensor : public TensorBase,
 
   bool has_allocation() const { return holder_ != nullptr; }
 
+  void debug_print_tmp() const{
+    std::cout << "DenseTensor: dims = [" << meta_.dims.size() << "]"
+          << ", holder_:" << holder_;
+    if (holder_){
+          std::cout << ", holder_->ptr():" << holder_->ptr() << std::endl;
+    }
+    else{
+      std::cout << std::endl;
+    }
+  }
+
   /// \brief Allocate memory with requested size from allocator.
   /// \return The mutable data pointer value of type T.
   void* AllocateFrom(Allocator* allocator,

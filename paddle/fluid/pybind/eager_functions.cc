@@ -724,6 +724,7 @@ PyObject* eager_api_run_custom_op(PyObject* self,
         bool valid =
             (!out_tensor->is_dense_tensor() && out_tensor->initialized()) ||
             (out_tensor->is_dense_tensor() && out_tensor->has_allocation());
+        out_tensor->debug_print();
         if (!valid) {
           PADDLE_ENFORCE(
               paddle::framework::detail::IsOptionalVar(outputs.at(i)) ||

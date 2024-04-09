@@ -54,6 +54,8 @@ DenseTensor::DenseTensor(const std::shared_ptr<phi::Allocation>& holder,
     : meta_(meta), holder_(holder) {}
 
 DenseTensor::DenseTensor(const DenseTensor& other) {  // NOLINT
+  VLOG(6) << "gongwb dense tensor assign" << " holder:" << other.holder_
+          << ", inplace_version_counter:" << other.inplace_version_counter_;
   this->meta_ = other.meta();
   holder_ = other.holder_;
   storage_properties_ = CopyStorageProperties(other.storage_properties_);
@@ -94,6 +96,8 @@ void* DenseTensor::AllocateFrom(Allocator* allocator,
                                 DataType dtype,
                                 size_t requested_size,
                                 bool fake_alloc) {
+  VLOG(6) << "gongwb AllocateFrom allocator:" << allocator 
+            << ", requested_size:" << requested_size;
   PADDLE_ENFORCE_NOT_NULL(
       allocator,
       phi::errors::InvalidArgument(
@@ -104,6 +108,7 @@ void* DenseTensor::AllocateFrom(Allocator* allocator,
   }
 
   size_t bytes = numel() * SizeOf(this->dtype());
+    VLOG(6) << "gongwb bytes:" << bytes ;
 
   if (fake_alloc) {
     bytes = 0;
@@ -124,7 +129,7 @@ void* DenseTensor::AllocateFrom(Allocator* allocator,
       bytes = requested_size;
     }
   }
-
+  VLOG(6) << "gongwb holder_:" << holder_;
   // NOTE(paddle-dev): In case of the allocator of storage_ is different with
   // the incoming allocator, we will re-alloc data using the incoming
   // allocator. See DeviceContext.Alloc in core/device_context.cc.
@@ -132,6 +137,7 @@ void* DenseTensor::AllocateFrom(Allocator* allocator,
     meta_.offset = 0;
     VLOG(10) << "Allocate data with bytes: " << bytes;
     auto holder = allocator->Allocate(bytes);
+    VLOG(6) << "gongwb holder:" << holder.get();
     if (holder_) {
       PADDLE_ENFORCE_LE(
           numel() * static_cast<int64_t>(SizeOf(dtype)) +
@@ -141,6 +147,7 @@ void* DenseTensor::AllocateFrom(Allocator* allocator,
               "The size of Holder is not enough to store the Tensor."));
     }
     holder_ = std::move(holder);
+    VLOG(6) << "gongwb holder:" << holder_->size();
   }
 
   return reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(holder_->ptr()) +
