@@ -403,6 +403,9 @@ class ColumnParallelLinear(paddle.nn.Layer):
         )
         self._name = name
         self.is_mp = self.world_size > 1
+        self.mp_rank = self.model_parallel_group.local_rank
+        print("mp_rank: ", self.mp_rank, flush=True)
+        print("world_size: ", self.world_size, flush=True)
 
         self.gather_output = gather_output
         assert out_features % self.world_size == 0, (
@@ -422,6 +425,11 @@ class ColumnParallelLinear(paddle.nn.Layer):
                     dtype=self._dtype,
                     is_bias=False,
                 )
+            tmp = paddle.normal(
+                mean=0.0, std=1.0, shape=[in_features, out_features]
+            )
+            splited = paddle.split(tmp, self.world_size)
+            self.weight.set_value(splited[self.mp_rank])
         else:
             self.weight = self.create_parameter(
                 shape=[in_features, self.output_size_per_partition],
